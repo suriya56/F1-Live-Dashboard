@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,7 +13,6 @@ license = {text = "MIT"}
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -32,8 +31,7 @@ dependencies = [
     "aioredis<2.0.0",
     "redis>=4.0.0",
 ]
-version = "0.2.2"
-dynamic = []
+version = "0.2.3"
 
 [project.urls]
 Homepage = "https://github.com/suriya56/F1-Live-Dashboard"
@@ -44,4 +42,4 @@ Repository = "https://github.com/suriya56/F1-Live-Dashboard"
 f1-dash = "f1_dash.main:main"
 
 [tool.setuptools]
-py-modules = []
+packages = ["f1_dash"]

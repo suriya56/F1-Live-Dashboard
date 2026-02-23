@@ -2,7 +2,7 @@
 F1 Dashboard - An enhanced F1 Live Position Dashboard with telemetry data.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 from .main import main, F1Dashboard, AVAILABLE_SEASONS
 from .database_manager import DatabaseManager, get_db_manager

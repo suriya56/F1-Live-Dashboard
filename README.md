@@ -91,10 +91,6 @@ The app uses a **tiered data retrieval** system:
 
 Data flows: API → SQLite → Redis → UI
 
-## License
-
-MIT License - see LICENSE file for details.
-
 ## Changelog
 
 ### v0.2.0 (2025-02-23)

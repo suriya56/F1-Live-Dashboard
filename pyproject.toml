@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -31,16 +31,16 @@ dependencies = [
     "aioredis>=2.0.0",
     "redis>=4.0.0",
 ]
-dynamic = ["version"]
+version = "0.2.1"
+dynamic = []
 
 [project.urls]
-Homepage = "https://github.com/yourusername/f1-dash"
-Repository = "https://github.com/yourusername/f1-dash"
-"Bug Tracker" = "https://github.com/yourusername/f1-dash/issues"
+Homepage = "https://github.com/suriya56/F1-Live-Dashboard"
+Repository = "https://github.com/suriya56/F1-Live-Dashboard"
+"Bug Tracker" = "https://github.com/suriya56/F1-Live-Dashboard/issues"
 
 [project.scripts]
 f1-dash = "f1_dash:main"
 
-[tool.setuptools_scm]
-version_scheme = "guess-next-dev"
-local_scheme = "dirty-tag"
+[tool.setuptools]
+py-modules = []

@@ -22,7 +22,7 @@ pip install f1-dash
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/f1-dash.git
+git clone https://github.com/suriya56/F1-Live-Dashboard.git
 cd f1-dash
 pip install .
 ```

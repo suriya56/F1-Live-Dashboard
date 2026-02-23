@@ -28,6 +28,8 @@ dependencies = [
     "pandas>=1.5.0",
     "rich>=13.0.0",
     "matplotlib>=3.5.0",
+    "aioredis>=2.0.0",
+    "redis>=4.0.0",
 ]
 dynamic = ["version"]
 

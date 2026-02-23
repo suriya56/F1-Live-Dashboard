@@ -27,6 +27,42 @@ cd f1-dash
 pip install .
 ```
 
+### Requirements
+
+- Python 3.8+ (tested up to Python 3.12)
+- Redis (optional, for caching - see below)
+- Internet connection for initial data fetch
+
+### Redis Installation (Optional)
+
+For optimal performance, install Redis:
+
+**Windows:**
+```bash
+# Using WSL2 (recommended)
+wsl --install
+sudo apt update
+sudo apt install redis-server
+sudo service redis-server start
+
+# Or using Docker
+docker run -d -p 6379:6379 redis:latest
+```
+
+**macOS/Linux:**
+```bash
+# macOS
+brew install redis
+brew services start redis
+
+# Linux (Ubuntu/Debian)
+sudo apt update
+sudo apt install redis-server
+sudo service redis-server start
+```
+
+> **Note**: The app will work without Redis, but caching provides faster data loading.
+
 ## Usage
 
 Run the dashboard:
@@ -71,6 +107,44 @@ docker run -d -p 6379:6379 redis:latest
 
 The app works without Redis (uses memory cache fallback).
 
+## Troubleshooting
+
+### Common Issues
+
+**Import Error with aioredis:**
+```bash
+# If you encounter aioredis compatibility issues:
+pip install "aioredis<2.0.0"
+```
+
+**App hangs on startup:**
+- Ensure you have a stable internet connection
+- Try running with verbose output: `python -m f1_dash.main`
+
+**Redis connection failed:**
+- The app will continue to work without Redis
+- Check if Redis is running: `redis-cli ping`
+- Verify Redis URL: `echo $REDIS_URL`
+
+**Permission errors:**
+- Ensure write permissions for the database file
+- Try running from a different directory
+
+**Data not loading:**
+- FastF1 API may be rate limited
+- Try again after a few minutes
+- Check if the season/event has data available
+
+### Getting Help
+
+If you encounter issues:
+1. Check the [GitHub Issues](https://github.com/suriya56/F1-Live-Dashboard/issues)
+2. Create a new issue with:
+   - Python version
+   - Operating system
+   - Error message
+   - Steps to reproduce
+
 ## Requirements
 
 - Python 3.8 or higher
@@ -79,8 +153,12 @@ The app works without Redis (uses memory cache fallback).
 - pandas >= 1.5.0
 - rich >= 13.0.0
 - matplotlib >= 3.5.0
-- aioredis >= 2.0.0 (optional, for Redis caching)
+- aioredis < 2.0.0 (optional, for Redis caching)
 - redis >= 4.0.0 (optional, for Redis caching)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Architecture
 

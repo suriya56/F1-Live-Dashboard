@@ -7,7 +7,7 @@ name = "f1-dash"
 description = "An enhanced F1 Live Position Dashboard with telemetry data"
 readme = "README.md"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"},
+    {name = "suriya56", email = "suriya56@example.com"},
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -28,7 +29,7 @@ dependencies = [
     "pandas>=1.5.0",
     "rich>=13.0.0",
     "matplotlib>=3.5.0",
-    "aioredis>=2.0.0",
+    "aioredis<2.0.0",
     "redis>=4.0.0",
 ]
 version = "0.2.2"
@@ -40,7 +41,7 @@ Repository = "https://github.com/suriya56/F1-Live-Dashboard"
 "Bug Tracker" = "https://github.com/suriya56/F1-Live-Dashboard/issues"
 
 [project.scripts]
-f1-dash = "f1_dash:main"
+f1-dash = "f1_dash.main:main"
 
 [tool.setuptools]
 py-modules = []

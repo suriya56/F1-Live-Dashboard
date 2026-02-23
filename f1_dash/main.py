@@ -36,6 +36,8 @@ from textual.widgets import Header, Footer, DataTable, TabbedContent, TabPane, S
 from textual.containers import Container, Horizontal, Vertical
 from textual import work, on
 from textual.reactive import reactive
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
@@ -76,7 +78,7 @@ _stderr_suppressor.suppress()
 
 # Import our new modules
 from .database_manager import get_db_manager, DatabaseManager
-from .cache_manager import get_cache_manager, CacheManager, cache_manager
+from .cache_manager import get_cache_manager_sync, CacheManager
 
 # Restore stderr for our own logging
 _stderr_suppressor.restore()
@@ -224,7 +226,7 @@ class F1Dashboard(App):
     def __init__(self):
         super().__init__()
         self.db_manager = get_db_manager()
-        self.cache_manager = cache_manager
+        self.cache_manager = get_cache_manager_sync()
         self._telemetry_cache = {}
         self.current_session_obj = None
 

@@ -17,7 +17,8 @@ try:
     import aioredis
     from aioredis import Redis as AsyncRedis
     REDIS_AVAILABLE = True
-except ImportError:
+except (ImportError, TypeError) as e:
+    print(f"Warning: Redis caching not available: {e}")
     REDIS_AVAILABLE = False
     AsyncRedis = None
 

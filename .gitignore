@@ -181,3 +181,12 @@ Thumbs.db
 
 # Log files
 *.log
+
+# Project-specific (not for PyPI)
+docs/
+instruction.md
+skills-lock.json
+.agents/
+*.db
+f1_dash.egg-info/
+f1.py

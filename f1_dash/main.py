@@ -24,30 +24,33 @@ Usage:
    The TUI can be exited by pressing Ctrl+C or q.
 """
 
-import fastf1
-import os
+import base64
 import logging
-from rich.console import Console
-from datetime import datetime, date
+import os
+import sqlite3
+from datetime import date, datetime
+from io import BytesIO
+
+import fastf1
+import matplotlib.pyplot as plt
 import pandas as pd
+import platformdirs
+from rich.console import Console
+from textual import on, work
 from textual.app import App, ComposeResult
+from textual.containers import Container, Horizontal, Vertical
+from textual.reactive import reactive
 from textual.widgets import (
-    Header,
-    Footer,
+    Button,
     DataTable,
+    Footer,
+    Header,
+    Label,
+    Select,
+    Static,
     TabbedContent,
     TabPane,
-    Static,
-    Select,
-    Button,
-    Label,
 )
-from textual.containers import Container, Horizontal, Vertical
-from textual import work, on
-from textual.reactive import reactive
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
 
 # Enable the cache for FastF1
 cache_path = "fastf1_cache"
@@ -55,6 +58,22 @@ if not os.path.exists(cache_path):
     os.makedirs(cache_path)
 
 fastf1.Cache.enable_cache(cache_path)
+
+MAX_SEASONS = 3
+ARCHIVE_DB_NAME = "seasons.db"
+
+
+def get_archive_db_path():
+    """Get platform-appropriate database path."""
+    try:
+        data_dir = platformdirs.user_data_dir("f1-dash")
+        os.makedirs(data_dir, exist_ok=True)
+        return os.path.join(data_dir, ARCHIVE_DB_NAME)
+    except Exception:
+        return ":memory:"
+
+
+ARCHIVE_DB_PATH = get_archive_db_path()
 
 # Suppress the verbose logging from FastF1
 fastf1.set_log_level(logging.ERROR)
@@ -126,6 +145,91 @@ def get_latest_event():
         return None, f"An error occurred while finding the latest event: {e}"
 
 
+def init_season_archive():
+    """Initialize the season archive database."""
+    try:
+        conn = sqlite3.connect(ARCHIVE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS race_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                year INTEGER NOT NULL,
+                event_name TEXT NOT NULL,
+                round_number INTEGER,
+                position INTEGER,
+                driver_code TEXT,
+                team_name TEXT,
+                points REAL,
+                archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(year, event_name, driver_code)
+            )
+        """)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logging.warning(f"Failed to init archive DB: {e}")
+        return False
+
+
+def save_race_result(year, event_name, round_number, results_data):
+    """Save race results to archive database."""
+    try:
+        conn = sqlite3.connect(ARCHIVE_DB_PATH)
+        cursor = conn.cursor()
+
+        for result in results_data:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO race_results
+                (year, event_name, round_number, position, driver_code, team_name, points)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    year,
+                    event_name,
+                    round_number,
+                    result.get("position"),
+                    result.get("driver"),
+                    result.get("team"),
+                    result.get("points", 0),
+                ),
+            )
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logging.warning(f"Failed to save race result: {e}")
+        return False
+
+
+def load_archived_result(year, event_name):
+    """Load archived race results from database."""
+    try:
+        conn = sqlite3.connect(ARCHIVE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT position, driver_code, team_name, points
+            FROM race_results
+            WHERE year = ? AND event_name = ?
+            ORDER BY position
+        """,
+            (year, event_name),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        if rows:
+            return [(str(r[0]), r[1], r[2], r[3]) for r in rows]
+        return None
+    except Exception as e:
+        logging.warning(f"Failed to load archived result: {e}")
+        return None
+
+
 class F1Dashboard(App):
     """
     An enhanced Textual app to display F1 session data and telemetry.
@@ -157,6 +261,8 @@ class F1Dashboard(App):
     current_session_data = reactive({})
     selected_driver = reactive(None)
     all_events = reactive([])
+    selected_year = reactive(None)
+    all_seasons = reactive([])
     live_data = reactive([])
     live_timer = reactive(None)
     last_update = reactive(None)
@@ -171,6 +277,11 @@ class F1Dashboard(App):
                     "Loading event data...", classes="session-info", id="event-info"
                 )
                 with Container():
+                    yield Select(
+                        [("Loading seasons...", "loading")],
+                        prompt="Select Year",
+                        id="year-select",
+                    )
                     yield Select(
                         [("Loading events...", "loading")],
                         prompt="Select Race/Event",
@@ -212,6 +323,7 @@ class F1Dashboard(App):
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
+        init_season_archive()  # Initialize database
         self.load_all_events()
 
     def action_quit(self):
@@ -221,37 +333,67 @@ class F1Dashboard(App):
 
     def action_refresh(self):
         """Action to refresh data."""
-        self.load_all_events()
+        if self.selected_year:
+            self.load_events_for_year(self.selected_year)
+        else:
+            self.load_all_events()
+
         if hasattr(self, "current_tab") and self.current_tab == "live":
             self.load_live_data()
 
     @work(exclusive=True, thread=True)
     def load_all_events(self):
-        """Load all F1 events for the current season."""
+        """Load all F1 events for available seasons."""
         try:
-            year = date.today().year
+            seasons = self.get_available_seasons()
+            self.all_seasons = seasons
+
+            season_options = [(str(s[0]), s[0]) for s in seasons]
+            self.call_from_thread(self.update_year_options, season_options)
+
+            default_year = seasons[0][1] if seasons else datetime.now().year
+            self.selected_year = default_year
+
+            self.load_events_for_year(default_year)
+
+        except Exception as e:
+            self.call_from_thread(self.update_event_info, f"Error loading seasons: {e}")
+
+    def get_available_seasons(self):
+        """Return list of available seasons (current year, current-1, current-2)."""
+        current_year = datetime.now().year
+        return [
+            (str(year), year)
+            for year in range(current_year, current_year - MAX_SEASONS, -1)
+        ]
+
+    def update_year_options(self, options):
+        """Update year select options."""
+        year_select = self.query_one("#year-select", Select)
+        year_select.set_options(options)
+
+    @work(exclusive=True, thread=True)
+    def load_events_for_year(self, year):
+        """Load events for a specific year."""
+        try:
+            self.call_from_thread(self.update_event_info, f"Loading {year} season...")
+
             schedule = fastf1.get_event_schedule(year)
 
             if schedule.empty:
-                self.call_from_thread(
-                    self.update_event_info,
-                    "Could not load F1 events for current season",
-                )
+                self.call_from_thread(self.update_event_info, f"No events for {year}")
                 return
 
-            # Convert schedule to list of event dictionaries
-            events_list = []
+            schedule["EventDate"] = pd.to_datetime(schedule["EventDate"])
             current_date = pd.Timestamp(datetime.now())
 
+            events_list = []
             for idx, event in schedule.iterrows():
                 event_date = pd.to_datetime(event["EventDate"])
-
-                # Create a unique ID for each event
                 event_id = (
                     f"{event['RoundNumber']}_{event['EventName'].replace(' ', '_')}"
                 )
 
-                # Determine event status
                 days_diff = (current_date - event_date).days
                 if days_diff > 4:
                     status = "Completed"
@@ -269,49 +411,37 @@ class F1Dashboard(App):
                     "Location": event.get("Location", "Unknown"),
                     "Status": status,
                     "DisplayName": f"R{event['RoundNumber']}: {event['EventName']} ({status})",
+                    "Year": year,
                 }
                 events_list.append(event_dict)
 
-            # Sort events by round number
             events_list.sort(key=lambda x: x["RoundNumber"])
             self.all_events = events_list
 
-            # Create options for the event selector
             event_options = [(evt["DisplayName"], evt["id"]) for evt in events_list]
-
-            # Find current or most recent event to select by default
-            default_event = None
-            for evt in events_list:
-                if evt["Status"] == "Current":
-                    default_event = evt
-                    break
-
-            if not default_event:
-                # No current event, find most recent completed
-                completed_events = [
-                    evt for evt in events_list if evt["Status"] == "Completed"
-                ]
-                if completed_events:
-                    default_event = completed_events[-1]
-
-            if not default_event and events_list:
-                # Fallback to first event
-                default_event = events_list[0]
-
             self.call_from_thread(self.update_event_options, event_options)
 
-            if default_event:
-                self.current_event = default_event
-                self.call_from_thread(self.set_default_event, default_event["id"])
-                self.load_event_sessions(default_event)
+            for evt in events_list:
+                if evt["Status"] == "Current":
+                    self.current_event = evt
+                    self.call_from_thread(self.set_default_event, evt["id"])
+                    self.load_event_sessions(evt)
+                    break
             else:
-                self.call_from_thread(
-                    self.update_event_info,
-                    f"Season {year} schedule loaded - select an event to view sessions",
-                )
+                if events_list:
+                    self.current_event = events_list[0]
+                    self.call_from_thread(self.set_default_event, events_list[0]["id"])
+                    self.load_event_sessions(events_list[0])
+
+            self.call_from_thread(
+                self.update_event_info,
+                f"{year} Season | {len(events_list)} events | Select an event",
+            )
 
         except Exception as e:
-            self.call_from_thread(self.update_event_info, f"Error loading events: {e}")
+            self.call_from_thread(
+                self.update_event_info, f"Error loading {year} season: {e}"
+            )
 
     @work(exclusive=True, thread=True)
     def load_event_sessions(self, event_dict):
@@ -367,6 +497,13 @@ class F1Dashboard(App):
                 self.update_event_info, f"Error loading sessions: {e}"
             )
 
+    @on(Select.Changed, "#year-select")
+    def year_changed(self, event: Select.Changed) -> None:
+        """Handle year selection change."""
+        if event.value and event.value != "loading":
+            self.selected_year = event.value
+            self.load_events_for_year(event.value)
+
     @on(Select.Changed, "#event-select")
     def event_changed(self, event: Select.Changed) -> None:
         """Handle event selection change."""
@@ -410,6 +547,36 @@ class F1Dashboard(App):
                     self.update_event_info, "No event data available."
                 )
                 return
+
+            # For race sessions, try loading from archive first
+            if session_key == "R":
+                event_name = self.current_event.get("EventName", "Unknown")
+                year = self.current_event.get("Year", datetime.now().year)
+                archived = load_archived_result(year, event_name)
+                if archived:
+                    data = []
+                    drivers = []
+                    for pos, driver, team, points in archived:
+                        data.append(
+                            (
+                                pos,
+                                driver,
+                                team,
+                                "-",
+                                "-",
+                                str(int(points) if points else 0),
+                            )
+                        )
+                        drivers.append((driver, driver))
+                    columns = ["Pos", "Driver", "Team", "Best Time", "Lap #", "Points"]
+
+                    self.call_from_thread(self.update_positions_table, data, columns)
+                    self.call_from_thread(self.update_driver_options, drivers)
+                    self.call_from_thread(
+                        self.update_event_info,
+                        f"Loaded {event_name} {year} from archive",
+                    )
+                    return
 
             self.call_from_thread(self.update_event_info, "Loading session data...")
 
@@ -465,6 +632,32 @@ class F1Dashboard(App):
             try:
                 results = session.results
                 laps = session.laps if hasattr(session, "laps") else pd.DataFrame()
+
+                # For race sessions, save to archive
+                if session_key == "R" and len(results) > 0:
+                    try:
+                        results_for_archive = []
+                        for _, r in results.iterrows():
+                            results_for_archive.append(
+                                {
+                                    "position": int(r.get("Position", 0)),
+                                    "driver": str(
+                                        r.get("Abbreviation", r.get("Driver", "UNK"))
+                                    ),
+                                    "team": str(
+                                        r.get("TeamName", r.get("Team", "Unknown"))
+                                    ),
+                                    "points": float(r.get("Points", 0)),
+                                }
+                            )
+                        event_name = self.current_event.get("EventName", "Unknown")
+                        round_num = self.current_event.get("RoundNumber", 0)
+                        year = self.current_event.get("Year", datetime.now().year)
+                        save_race_result(
+                            year, event_name, round_num, results_for_archive
+                        )
+                    except Exception as e:
+                        pass  # Silently fail archive save
 
                 # Debug info
                 debug_info = f"Results: {len(results)} rows"

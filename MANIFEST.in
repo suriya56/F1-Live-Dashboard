@@ -1,0 +1,8 @@
+include LICENSE
+include README.md
+recursive-exclude f1_dash __pycache__
+recursive-exclude f1_dash *.pyc
+recursive-exclude f1_dash fastf1_cache
+recursive-exclude f1_dash *.db
+global-exclude __pycache__
+global-exclude *.py[co]

@@ -4,13 +4,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 with open("requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+    requirements = [
+        line.strip() for line in fh if line.strip() and not line.startswith("#")
+    ]
 
 setup(
     name="f1-dash",
-    version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    version="0.2.4",
+    author="F1 Dashboard Team",
     description="An enhanced F1 Live Position Dashboard with telemetry data",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -31,7 +32,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "f1-dash=f1_dash:main",
+            "f1-dash=f1_dash.main:main",
         ],
     },
     include_package_data=True,

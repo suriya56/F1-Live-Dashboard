@@ -216,6 +216,7 @@ class F1Dashboard(App):
 
     def action_quit(self):
         """Action to quit the app."""
+        self.stop_live_timer()
         self.exit()
 
     def action_refresh(self):
